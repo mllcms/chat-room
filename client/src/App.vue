@@ -107,9 +107,11 @@ const cache = reactive<Record<string, MsgCache[]>>({});
 function send() {
   if (!msg.msg) return;
   if (!websocket) return ElMessage.error("没有 websocket 连接")
-  if (websocket.CLOSED) {
+
+  // 连接断开
+  if (websocket.readyState == websocket.CLOSED) {
     login()
-    return ElMessage.error("Service reconnecting")
+    return ElMessage.warning("服务重连中 请稍后")
   }
 
   const arr = cache[msg.target.id] ||= []
