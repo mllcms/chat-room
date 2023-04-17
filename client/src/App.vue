@@ -24,14 +24,20 @@ const listShow = computed(() => {
 });
 
 let websocket: WebSocket | null = null;
-const login = () => {
+const login = async () => {
   if (!user.name) {
     ElMessage.error("用户名不能为空");
     return;
   }
+
+  if (!show.value) return
   show.value = false;
 
-  websocket = new WebSocket("ws://127.0.0.1:80/ws");
+  init_websocket()
+};
+
+function init_websocket() {
+  websocket = new WebSocket(`ws://${window.location.hostname}/ws`);
   websocket.onopen = function () {
     this.send(JSON.stringify(createData("login", "", user)));
   };
@@ -76,13 +82,13 @@ const login = () => {
     }
   };
   websocket.onerror = function () {
+    if (this.readyState == this.CLOSED) return
     ElMessage.error("系统错误!!!请尝试刷新");
   };
   websocket.onclose = function () {
     ElMessage.error("与服务器断开连接!!!请尝试刷新")
   }
-};
-
+}
 
 const pub = reactive<User>({
   id: "pubilc",
@@ -110,7 +116,7 @@ function send() {
 
   // 连接断开
   if (websocket.readyState == websocket.CLOSED) {
-    login()
+    init_websocket()
     return ElMessage.warning("服务重连中 请稍后")
   }
 

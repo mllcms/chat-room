@@ -1,4 +1,3 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use crate::middleware::logger::logger;
 use axum::{
     extract::{
@@ -6,12 +5,13 @@ use axum::{
         WebSocketUpgrade,
     },
     middleware::from_fn,
-    response::{Redirect, Response},
+    response::Response,
     routing::get,
     Extension, Router,
 };
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     sync::{
         mpsc::{channel, Sender},
@@ -21,26 +21,35 @@ use tokio::{
     time::sleep,
 };
 
+use tower_http::services::ServeDir;
+
+// 用户状态
 type UsersState = Arc<Mutex<HashMap<String, User>>>;
+
+// ws通信地址
+#[derive(Clone)]
+struct WsAddr(String);
 
 pub fn run(addr: &'static str) -> JoinHandle<()> {
     let users: UsersState = Arc::new(Mutex::new(HashMap::new()));
 
     tokio::spawn(async move {
-        let static_server = axum_static::static_router("app/")
-            .route("/", get(|| async { Redirect::temporary("/index.html") }));
+        println!("Server running at http://{addr}");
 
         let app = Router::new()
-            .nest("/", static_server)
+            .nest_service(
+                "/",
+                ServeDir::new("dist").append_index_html_on_directories(true),
+            )
             .route("/ws", get(webscoket))
             .layer(Extension(users))
             .layer(from_fn(logger));
 
-        println!("Server running at http://{}", addr);
         axum::Server::bind(&addr.parse().unwrap())
             .serve(app.into_make_service_with_connect_info::<SocketAddr>())
             .await
             .unwrap();
+
         println!("{} Server stop {}", "-".repeat(10), "-".repeat(10));
     })
 }
