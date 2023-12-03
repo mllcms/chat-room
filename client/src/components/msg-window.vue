@@ -1,31 +1,48 @@
 <script setup lang="ts">
 import type { MsgCache } from '@/types';
 import portrait from "@/components/portrait.vue"
-import { nextTick, onMounted, ref, watch } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 
 const props = defineProps<{
-    msgs: MsgCache[]
+    cache: { unread: number, data: MsgCache[] }
 }>()
+
 const msgWindow = ref<HTMLElement>()
-watch(() => props.msgs, () => {
+// 切换消息时下拉底部
+watch(() => props.cache.data, () => {
     nextTick(() => {
+        props.cache.unread = 0
         msgWindow.value?.scrollTo(0, msgWindow.value.scrollHeight)
     })
 });
-watch(() => props.msgs.length, () => {
+// 新消息自动下拉
+watch(() => props.cache.data.length, () => {
     const dom = msgWindow.value
-    if (!dom || dom.scrollHeight - dom.scrollTop > 700) {
+    if (!dom || dom.scrollHeight - dom.scrollTop > dom.clientHeight * 1.3) {
+        if (dom?.scrollHeight == dom?.clientHeight) {
+            props.cache.unread -= 1
+        }
         return
     }
+
+    props.cache.unread -= 1
+    
     nextTick(() => {
         msgWindow.value?.scrollTo(0, msgWindow.value.scrollHeight)
     })
 })
 
+const scroll = ({ target }: any) => {
+    if (target.scrollHeight - target.scrollTop - target.clientHeight < 2) {
+        if (props.cache.unread > 0) {
+            props.cache.unread = 0
+        }
+    }
+}
 </script>
 <template>
-    <div class="msg-window" ref="msgWindow">
-        <template v-for="item in msgs">
+    <div class="msg-window" ref="msgWindow" @scroll="scroll">
+        <template v-for="item in cache.data">
             <div class="msg-left" v-if="item.position == 'left'">
                 <portrait :name="item.target.name" class="portrait" />
                 <small>{{ item.tiem }}</small>
@@ -42,7 +59,7 @@ watch(() => props.msgs.length, () => {
         </template>
     </div>
 </template>
-<style>
+<style scoped>
 .msg-window {
     display: flex;
     flex-flow: column;

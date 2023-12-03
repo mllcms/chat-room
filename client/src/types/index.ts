@@ -1,44 +1,42 @@
-import { moment, uuid } from "@/utils";
+import { moment } from '@/utils'
 
 export interface User {
-  id: string;
-  name: string;
+  id: string
+  name: string
 }
 export interface Data {
-  type: "login" | "logout" | "system" | "public" | "private" | "error";
-  msg: string;
-  target: User;
-  list?: User[] | null;
+  type: 'login' | 'logout' | 'system' | 'public' | 'private' | 'error'
+  msg: string
+  target: User
+  list?: User[] | null
 }
 
-
-export function createData(type:Data["type"],msg:string,target:User):Data {
+export function createData(type: Data['type'], msg: string, target: User): Data {
   return {
     type,
     msg,
-    target
+    target,
   }
 }
 
-export interface Message {
-  type: "public" | "private";
-  target: User;
-  msg: string;
+export interface SendMsg {
+  type: 'public' | 'private'
+  target: User
+  msg: string
 }
 
 export interface MsgCache {
-  position: "left" | "center" | "right";
-  target: User;
-  msg: string;
-  tiem: string;
+  position: 'left' | 'center' | 'right'
+  target: User
+  msg: string
+  tiem: string
 }
 
-export function createMsgCache(position:MsgCache["position"],target:User,msg:string):MsgCache{
+export function createMsgCache(position: MsgCache['position'], target: User, msg: string): MsgCache {
   return {
     position,
     target,
     msg,
-    tiem:moment("MM月DD日 HH:mm:ss")
+    tiem: moment('MM月DD日 HH:mm:ss'),
   }
 }
-

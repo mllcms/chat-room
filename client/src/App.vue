@@ -1,130 +1,135 @@
 <script setup lang="ts">
-import { computed, h, reactive, ref } from "vue";
-import { uuid } from "./utils";
-import { ElMessage, ElNotification } from "element-plus";
-import listItem from "@/components/list-item.vue";
-import { Search } from "@element-plus/icons-vue";
-import { createData, createMsgCache, type Data, type Message, type MsgCache, type User } from "@/types"
-import msgWindow from "@/components/msg-window.vue"
+import { computed, h, reactive, ref } from 'vue'
+import { CacheMsg, uuid } from './utils'
+import { ElMessage, ElNotification } from 'element-plus'
+import listItem from '@/components/list-item.vue'
+import { Search } from '@element-plus/icons-vue'
+import { createData, createMsgCache, type Data, type SendMsg, type User } from '@/types'
+import msgWindow from '@/components/msg-window.vue'
 
-const show = ref(true);
+const show = ref(true)
 const user = reactive<User>({
   id: uuid(),
-  name: "",
-});
-const search = ref<string>("");
-const list = ref<User[]>([]);
+  name: '',
+})
+const search = ref<string>('')
+const list = ref<User[]>([])
 const listShow = computed(() => {
   if (search) {
-    return list.value.filter((item) =>
-      item.name.toLowerCase().includes(search.value.toLowerCase())
-    );
+    return list.value.filter(item => {
+      if (item.id == user.id) return false
+      if (!search) return true
+      return item.name.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase())
+    })
   }
-  return list.value;
-});
+  return list.value
+})
 
-let websocket: WebSocket | null = null;
+let websocket: WebSocket | null = null
 const login = async () => {
   if (!user.name) {
-    ElMessage.error("用户名不能为空");
-    return;
+    ElMessage.error('用户名不能为空')
+    return
   }
 
   if (!show.value) return
-  show.value = false;
+  show.value = false
 
   init_websocket()
-};
+}
 
 function init_websocket() {
-  websocket = new WebSocket(`ws://${window.location.hostname}/ws`);
+  websocket = new WebSocket(`ws://${window.location.hostname}/ws`)
   websocket.onopen = function () {
-    this.send(JSON.stringify(createData("login", "", user)));
-  };
+    this.send(JSON.stringify(createData('login', '', user)))
+  }
 
   websocket.onmessage = function (event) {
-    const data: Data = JSON.parse(event.data);
-    const pub = cache["pubilc"] ||= []
+    const data: Data = JSON.parse(event.data)
+    const pub = cache.get('pubilc')
 
     switch (data.type) {
-      case "error":
-        ElMessage.error(data.msg);
-        break;
-      case "login":
-      case "logout":
-      case "system": {
+      case 'error':
+        ElMessage.error(data.msg)
+        break
+      case 'login':
+      case 'logout':
+      case 'system': {
         ElNotification({
-          title: "系统消息",
-          message: h("span", { style: "color: #337ecc" }, data.msg),
-        });
+          title: '系统消息',
+          message: h('span', { style: 'color: #337ecc' }, data.msg),
+        })
         if (data.list) {
-          list.value = data.list;
+          list.value = data.list
         }
-        if (data.type == "logout") {
-          Reflect.deleteProperty(cache, data.target.id)
+        if (data.type == 'logout') {
+          cache.remove(data.target.id)
         }
-        pub.push(createMsgCache("center", data.target, data.msg))
+        pub.data.push(createMsgCache('center', data.target, data.msg))
+        pub.unread += 1
         break
       }
-      case "public": {
+      case 'public': {
         if (data.target.id != user.id) {
-          pub.push(createMsgCache("left", data.target, data.msg))
+          pub.data.push(createMsgCache('left', data.target, data.msg))
+          pub.unread += 1
         }
         break
       }
-      case "private":
-        const arr = cache[data.target.id] ||= []
-        arr.push(createMsgCache("left", data.target, data.msg))
+      case 'private':
+        const priv = cache.get(data.target.id)
+        priv.data.push(createMsgCache('left', data.target, data.msg))
+        priv.unread += 1
         break
       default: {
-        console.log(event.data);
+        console.log(event.data)
       }
     }
-  };
+  }
   websocket.onerror = function () {
     if (this.readyState == this.CLOSED) return
-    ElMessage.error("系统错误!!!请尝试刷新");
-  };
+    ElMessage.error('系统错误!!!请尝试刷新')
+  }
   websocket.onclose = function () {
-    ElMessage.error("与服务器断开连接!!!请尝试刷新")
+    ElMessage.error('与服务器断开连接!!!请尝试刷新')
   }
 }
 
 const pub = reactive<User>({
-  id: "pubilc",
-  name: "公共聊天室",
-});
-const msg = reactive<Message>({
-  type: "public",
+  id: 'pubilc',
+  name: '公共聊天室',
+})
+const msg = reactive<SendMsg>({
+  type: 'public',
   target: pub,
-  msg: "",
-});
+  msg: '',
+})
 
 function change(user: User) {
   if (user == pub) {
-    msg.type = "public";
+    msg.type = 'public'
   } else {
-    msg.type = "private";
+    msg.type = 'private'
   }
-  msg.target = user;
+  msg.target = user
 }
 
-const cache = reactive<Record<string, MsgCache[]>>({});
+const cache = new CacheMsg()
 function send() {
-  if (!msg.msg) return;
-  if (!websocket) return ElMessage.error("没有 websocket 连接")
+  if (!msg.msg) return
+  if (!websocket) return ElMessage.error('没有 websocket 连接')
 
   // 连接断开
   if (websocket.readyState == websocket.CLOSED) {
     init_websocket()
-    return ElMessage.warning("服务重连中 请稍后")
+    return ElMessage.warning('服务重连中 请稍后')
   }
 
-  const arr = cache[msg.target.id] ||= []
-  arr.push(createMsgCache("right", user, msg.msg))
-
+  const arr = cache.getData(msg.target.id)
+  arr.push(createMsgCache('right', user, msg.msg))
+  cache.addUnread(msg.target.id)
   websocket.send(JSON.stringify(msg))
-  msg.msg = "";
+  msg.msg = ''
 }
 </script>
 
@@ -149,13 +154,14 @@ function send() {
     </div>
     <!-- 用户列表 -->
     <div class="list">
-      <list-item :name="pub.name" :class="{ active: msg.target == pub }" @click="change(pub)" />
+      <list-item :name="pub.name" :class="{ active: msg.target == pub }" @click="change(pub)"
+        :unread="cache.getUnread(pub.id)" />
       <list-item v-for="user in listShow" :name="user.name" :class="{ active: msg.target == user }" @click="change(user)"
-        :key="user.id" />
+        :key="user.id" :unread="cache.getUnread(user.id)" />
     </div>
     <!-- 消息窗口 -->
     <div class="window">
-      <msg-window :msgs="cache[msg.target.id] || []" />
+      <msg-window :cache="cache.get(msg.target.id)" />
       <div class="input">
         <el-input v-model="msg.msg" @keyup.enter="send" :placeholder="`发送到 ${msg.target.name}`" />
         <el-button type="primary" @click="send">发送</el-button>

@@ -1,20 +1,33 @@
 <script setup lang="ts">
-import { withDefaults } from 'vue';
-import portrait from "@/components/portrait.vue"
+import { ref, watch, withDefaults } from 'vue'
+import portrait from '@/components/portrait.vue'
 
-withDefaults(defineProps<{
-    name: string,
-    width?: number
-    height?: number
-}>(), {
-    width: 40,
-    height: 40
+const props = withDefaults(
+    defineProps<{
+        name: string
+        unread: number
+        width?: number
+        height?: number
+    }>(),
+    {
+        width: 40,
+        height: 40,
+    }
+)
+
+const unread = ref(0)
+let timer = 0;
+watch(() => props.unread, nv => {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+        unread.value = nv
+    }, 100)
 })
 
 </script>
 <template>
     <div class="list-item">
-        <portrait :name="name" />
+        <portrait :name="name" :unread="unread" />
         <p>{{ name }}</p>
     </div>
 </template>
@@ -31,7 +44,7 @@ withDefaults(defineProps<{
 
 .list-item:hover {
     cursor: pointer;
-    background-color: rgba(237, 238, 238, .8);
+    background-color: rgba(237, 238, 238, 0.8);
 }
 
 .list-item p {
